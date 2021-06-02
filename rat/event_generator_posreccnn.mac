@@ -1,0 +1,145 @@
+########################################################
+# Code to generate evt in ar40 using posreccnn.py
+# Fill Level: 551
+# Hardware: bulkTPB
+# File type: ar40_lowE_lowThr
+# Date: 2020-11-04.09:26:06
+# RAT Version: DEAP/CLEAN RAT rat-deap@b6d5fa969ed54691b33454e3b20a02dab45b2114
+# Author: Robert Stainforth (rpfs@physics.carleton.ca)
+# Created using: create_RAT_macros.py
+########################################################
+
+### Omit muonic and hadronic processes
+/glg4debug/glg4param omit_muon_processes 1.0
+/glg4debug/glg4param omit_hadronic_processes 0.0
+
+### Setup the detector fields, DEAP-3600
+/rat/db/set DETECTOR experiment "DEAP-3600"
+/rat/db/set DETECTOR geo_file "DEAP-3600/DEAP-3600bulkTPB_partial_LArcoating_50micron.geo"
+
+/rat/db/set GEO[cryoliquid_top] material "gaseous_Ar"
+/rat/db/set GEO[cryoliquid] material "liquid_Ar"
+/rat/db/set GEO[cryoliquid_top] z_split 551.0
+/rat/db/set GEO[cryoliquid] z_split 551.0
+
+
+# Save the V1740 information for possible clipping correction
+/rat/db/set DAQ eb_enable_v1740 1
+
+### MBLikelihood parameters - default settings in MBFIT.ratdb
+#/rat/db/set MBFIT single_pe 0   ## commented out example to override input charge to qPE
+### ShellFit parameters - default settings in SHELLFIT.ratdb
+### TimeFit2 parameters - default settings in TIMEFIT2.ratdb
+
+/rat/db/set DAQ trigger_settings "456"
+
+### Fit using relative PMT efficiency corrections
+/rat/db/set PMTEFF use_couchdb_for_generator 1
+/rat/db/set PMTEFF use_couchdb_for_processors 1
+
+/rat/db/set DAQtrigger[456] adctrigger_ethresh_low 300
+
+/run/initialize
+
+# Don't store tracking info
+/tracking/storeTrajectory 0
+
+### BEGIN EVENT LOOP
+
+/rat/proc daq
+
+### For official processing, we want to ensure that constants were uploaded
+/rat/proc smartcal
+# 20/02/21 DG: Disable for now because need to supply a proper subrun ID first.
+#/rat/procset dieifnoppgoffsets 1
+
+### sequence as tested by James
+/rat/proc lowlevelcuts
+/rat/proc multievent
+/rat/proc triggertime
+/rat/proc timefit
+/rat/proc subpeakisolation
+/rat/proc latelightvars
+/rat/proc charge
+/rat/proc fitcentroid
+/rat/proc singlettripletfit
+/rat/proc ringpe
+
+/rat/proc singlepe
+/rat/proc fmaxpe
+/rat/proc nmaxpe
+/rat/procset chargeest "nsc"
+
+/rat/proc eventprecursor
+/rat/proc saturationfix
+/rat/procset enableCorrection 1
+
+/rat/proc surfacesearch
+/rat/procset num_first_pulses 10
+/rat/procset num_highest_charge_pulses 3
+
+/rat/proc lratio
+/rat/proc fitmblikelihood
+/rat/proc shellfit
+/rat/procset scale_ROIElowfp 10
+/rat/procset scale_betas 10
+
+/rat/proc lrecoil
+/rat/procset no_afterpulses 0
+/rat/procset pe_per_keV 7.1 # Fig. 70 in DEAP-STR-2018-004
+
+/rat/proc lrecoil
+/rat/procset no_afterpulses 1
+/rat/procset pe_per_keV 7.1 # Fig. 70 in DEAP-STR-2018-004
+
+/rat/proc timefit2
+
+/rat/proc shtfilter
+/rat/procset chargeest "nsc"
+/rat/procset mode "verbose"
+/rat/procset scale_except_ROIEhighfp 100
+
+/rat/proc multisite
+/rat/proc promptsubpeakstat
+/rat/proc pmtfirstpulse
+/rat/procset time_window_start -150.
+/rat/procset time_window_end 150.
+/rat/procset last_gar_pmt_id 64
+
+/rat/proc scintillationlikelihood
+/rat/procset readfile "scintlikedata.root"
+
+/rat/proc python
+/rat/procset class "ratproc.posreccnn.PosRecCNN()"
+### DBscan needs appropriate prescale, procset scale_except_ROIEhighfp did not work here - reprocess skims later
+#/rat/proc python
+#/rat/procset class "ratproc.cluster.dbscan()"
+
+/rat/proc count
+/rat/procset update 10
+
+/rat/proc python
+/rat/procset class "ratproc.DeltaT()"
+
+/rat/proc python
+/rat/procset class "ratproc.ntuple.Ntuple('test2bis_ntp.root', 'data_mc')"
+
+# Pruning by MC Usher
+/rat/proc prune
+/rat/procset prune "raw"
+/rat/procset prune "mc.pmt.pulse,mc.track"
+
+/rat/proc outroot
+/rat/procset file "test2bis.root"
+
+### END EVENT LOOP
+
+
+# Event generation for this particle
+/generator/add combo gun2:fillshell
+/generator/vtx/set Ar40 0 0 0 0 0.001 0.150	#lats two digits are energy scale in MEv
+/generator/pos/set 0 0 0 0.0 851.0 cryoliquid
+
+# The overall rate of the events
+/generator/rate/set 1
+/run/beamOn 10000  	   #total num of evt
