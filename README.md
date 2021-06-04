@@ -20,7 +20,7 @@ Two files : <br/>
   training_models/Inception_trainning.py (from Lucas Doria) : trains CNNs using data.crafter.py files <br/>
   training_models/Inception_testing.py (from Lucas Doria) : tests CNNs using data.crafter.py files <br/>
 
-4.postprocessing/ : <br/>
+4. postprocessing/ : <br/>
 Two files : <br/>
   postprocessing/desaler.py : used to put CNN predictions in the right units and shape so that posrec_compare.C. can run <br/>
   postprocessing/posrec_compare.C plots a bunch of graphs that can be used to evaluate posrec algorithms perfomances <br/>
